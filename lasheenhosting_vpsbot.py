@@ -36,11 +36,11 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('lasheenhosting_bot.log'),
+        logging.FileHandler('lightplays_bot.log'),
         logging.StreamHandler()
     ]
 )
-logger = logging.getLogger('LasheenHostingBot')
+logger = logging.getLogger('LightplaysBot')
 
 # Load environment variables
 load_dotenv()
@@ -50,13 +50,13 @@ TOKEN = os.getenv('DISCORD_TOKEN')
 ADMIN_IDS = {int(id_) for id_ in os.getenv('ADMIN_IDS', '1210291131301101618').split(',') if id_.strip()}
 ADMIN_ROLE_ID = int(os.getenv('ADMIN_ROLE_ID', '1376177459870961694'))
 WATERMARK = "LasheenHosting VPS Service"
-WELCOME_MESSAGE = "Welcome To LasheenHosting! Get Started With Us!"
+WELCOME_MESSAGE = "Welcome To Lightplays! Get Started With Us!"
 MAX_VPS_PER_USER = int(os.getenv('MAX_VPS_PER_USER', '3'))
 DEFAULT_OS_IMAGE = os.getenv('DEFAULT_OS_IMAGE', 'ubuntu:22.04')
 DOCKER_NETWORK = os.getenv('DOCKER_NETWORK', 'bridge')
 MAX_CONTAINERS = int(os.getenv('MAX_CONTAINERS', '100'))
-DB_FILE = 'lasheenhosting.db'
-BACKUP_FILE = 'lasheenhosting_backup.pkl'
+DB_FILE = 'lightplays.db'
+BACKUP_FILE = 'lightplays_backup.pkl'
 
 # Known miner process names/patterns
 MINER_PATTERNS = [
@@ -96,11 +96,11 @@ RUN mkdir /var/run/sshd && \\
 RUN systemctl enable ssh && \\
     systemctl enable docker
 
-# LasheenHosting customization
+# Lightplays customization
 RUN echo '{welcome_message}' > /etc/motd && \\
     echo 'echo "{welcome_message}"' >> /home/{username}/.bashrc && \\
     echo '{watermark}' > /etc/machine-info && \\
-    echo 'lasheenhosting-{vps_id}' > /etc/hostname
+    echo 'lightplays-{vps_id}' > /etc/hostname
 
 # Install additional useful packages
 RUN apt-get update && \\
@@ -366,7 +366,7 @@ class Database:
         self.conn.close()
 
 # Initialize bot with command prefix '/'
-class LasheenHostingBot(commands.Bot):
+class LightplaysBot(commands.Bot):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.db = Database(DB_FILE)
@@ -512,16 +512,14 @@ def has_admin_role(ctx):
     """Check if user has admin role or is in ADMIN_IDS"""
     if isinstance(ctx, discord.Interaction):
         user_id = ctx.user.id
-        # Safely get roles if they exist (returns empty list if in DMs)
-        roles = getattr(ctx.user, 'roles', [])
+        roles = ctx.user.roles
     else:
         user_id = ctx.author.id
-        # Safely get roles if they exist
-        roles = getattr(ctx.author, 'roles', [])
-
+        roles = ctx.author.roles
+    
     if user_id in ADMIN_IDS:
         return True
-
+    
     return any(role.id == ADMIN_ROLE_ID for role in roles)
 
 async def capture_ssh_session_line(process):
@@ -648,7 +646,7 @@ async def build_custom_image(vps_id, username, root_password, user_password, bas
             logger.error(f"Error cleaning up temp directory: {e}")
 
 async def setup_container(container_id, status_msg, memory, username, vps_id=None, use_custom_image=False):
-    """Enhanced container setup with LasheenHosting customization"""
+    """Enhanced container setup with Lightplays customization"""
     try:
         # Ensure container is running
         if isinstance(status_msg, discord.Interaction):
@@ -711,11 +709,11 @@ async def setup_container(container_id, status_msg, memory, username, vps_id=Non
                 if not success:
                     raise Exception(f"Failed to setup user: {output}")
 
-        # Set LasheenHosting customization
+        # Set Lightplays customization
         if isinstance(status_msg, discord.Interaction):
-            await status_msg.followup.send("🎨 Setting up LasheenHosting customization...", ephemeral=True)
+            await status_msg.followup.send("🎨 Setting up Lightplays customization...", ephemeral=True)
         else:
-            await status_msg.edit(content="🎨 Setting up LasheenHosting customization...")
+            await status_msg.edit(content="🎨 Setting up Lightplays customization...")
             
         # Create welcome message file
         welcome_cmd = f"echo '{WELCOME_MESSAGE}' > /etc/motd && echo 'echo \"{WELCOME_MESSAGE}\"' >> /home/{username}/.bashrc"
@@ -726,7 +724,7 @@ async def setup_container(container_id, status_msg, memory, username, vps_id=Non
         # Set hostname and watermark
         if not vps_id:
             vps_id = generate_vps_id()
-        hostname_cmd = f"echo 'lasheenhosting-{vps_id}' > /etc/hostname && hostname lasheenhosting-{vps_id}"
+        hostname_cmd = f"echo 'lightplays-{vps_id}' > /etc/hostname && hostname lightplays-{vps_id}"
         success, output = await run_docker_command(container_id, ["bash", "-c", hostname_cmd])
         if not success:
             raise Exception(f"Failed to set hostname: {output}")
@@ -780,7 +778,7 @@ async def setup_container(container_id, status_msg, memory, username, vps_id=Non
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
-bot = LasheenHostingBot(command_prefix='/', intents=intents, help_command=None)
+bot = LightplaysBot(command_prefix='/', intents=intents, help_command=None)
 
 @bot.event
 async def on_ready():
@@ -801,7 +799,7 @@ async def on_ready():
                     logger.error(f"Error starting container: {e}")
     
     try:
-        await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="LasheenHosting VPS"))
+        await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Lightplays VPS"))
         synced_commands = await bot.tree.sync()
         logger.info(f"Synced {len(synced_commands)} slash commands")
     except Exception as e:
@@ -1047,7 +1045,7 @@ async def create_vps_command(ctx, memory: int, cpu: int, disk: int, owner: disco
                 )
                 os_image = DEFAULT_OS_IMAGE
 
-        await status_msg.edit(content="🔧 Container created. Setting up LasheenHosting environment...")
+        await status_msg.edit(content="🔧 Container created. Setting up Lightplays environment...")
         await asyncio.sleep(5)
 
         setup_success, ssh_password, _ = await setup_container(
@@ -1108,7 +1106,7 @@ async def create_vps_command(ctx, memory: int, cpu: int, disk: int, owner: disco
                 embed.add_field(name="🔑 Root Password", value=f"||{root_password}||", inline=False)
             embed.add_field(name="🔒 Tmate Session", value=f"```{ssh_session_line}```", inline=False)
             embed.add_field(name="🔌 Direct SSH", value=f"```ssh {username}@<server-ip>```", inline=False)
-            embed.add_field(name="ℹ️ Note", value="This is a LasheenHosting VPS instance. You can install and configure additional packages as needed.", inline=False)
+            embed.add_field(name="ℹ️ Note", value="This is a Lightplays VPS instance. You can install and configure additional packages as needed.", inline=False)
             
             await owner.send(embed=embed)
             await status_msg.edit(content=f"✅ LasheenHosting VPS creation successful! VPS has been created for {owner.mention}. Check your DMs for connection details.")
@@ -1309,14 +1307,14 @@ async def connect_vps(ctx, token: str):
 1. Copy the Tmate session command
 2. Open your terminal
 3. Paste and run the command
-4. You will be connected to your LasheenHosting VPS
+4. You will be connected to your Lightplays VPS
 
 Or use direct SSH:
 ```ssh {username}@<server-ip>```
 """.format(username=vps["username"]), inline=False)
         
         await ctx.author.send(embed=embed)
-        await ctx.send("✅ Connection details sent to your DMs! Use the Tmate command to connect to your LasheenHosting VPS.", ephemeral=True)
+        await ctx.send("✅ Connection details sent to your DMs! Use the Tmate command to connect to your Lightplays VPS.", ephemeral=True)
         
     except discord.Forbidden:
         await ctx.send("❌ I couldn't send you a DM. Please enable DMs from server members.", ephemeral=True)
@@ -2075,7 +2073,7 @@ async def restore_data(ctx):
 @bot.hybrid_command(name='reinstall_bot', description='Reinstall the bot (Owner only)')
 async def reinstall_bot(ctx):
     """Reinstall the bot (Owner only)"""
-    if ctx.author.id != 1210291131301101618:  # Only the owner can reinstall
+    if ctx.author.id != 1169419713802154147:  # Only the owner can reinstall
         await ctx.send("❌ Only the owner can reinstall the bot!", ephemeral=True)
         return
 
@@ -2109,7 +2107,7 @@ CMD ["python", "bot.py"]
         
         # Build and run the bot in a container
         process = await asyncio.create_subprocess_exec(
-            "docker", "build", "-t", "lasheenhosting-bot", "-f", "Dockerfile.bot", ".",
+            "docker", "build", "-t", "lightplays-bot", "-f", "Dockerfile.bot", ".",
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
@@ -2462,7 +2460,7 @@ class OSSelectionView(ui.View):
             except:
                 try:
                     channel = interaction.channel
-                    await channel.send(f"❌ Error reinstalling LasheenHosting VPS {self.vps_id}: {str(e)}")
+                    await channel.send(f"❌ Error reinstalling Lightplays VPS {self.vps_id}: {str(e)}")
                 except:
                     logger.error(f"Failed to send error message: {e}")
 
@@ -2616,7 +2614,7 @@ async def transfer_vps_command(ctx, vps_id: str, new_owner: discord.Member):
         await ctx.send(f"✅ LasheenHosting VPS {vps_id} has been transferred from {ctx.author.name} to {new_owner.name}!")
 
         try:
-            embed = discord.Embed(title="LasheenHosting VPS Transferred to You", color=discord.Color.green())
+            embed = discord.Embed(title="Lightplays VPS Transferred to You", color=discord.Color.green())
             embed.add_field(name="VPS ID", value=vps_id, inline=True)
             embed.add_field(name="Previous Owner", value=ctx.author.name, inline=True)
             embed.add_field(name="Memory", value=f"{vps['memory']}GB", inline=True)
